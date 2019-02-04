@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/antlad/mqtt_issue/mqtt_conn"
+	"github.com/satori/go.uuid"
 )
 
 type producerCtx struct {
@@ -32,10 +36,45 @@ func getEnv(env string, val string) string {
 }
 
 var (
-	mqttTopic = getEnv("MQTT_TOPIC", "topic1")
+	mqttTopic   = getEnv("MQTT_TOPIC", "topic1")
+	msgTemplate = `{"success": true, "datatype": "float", "timestamp": {{ unixNow }}, "registerId": "{{ randomUUID }}", "value": {{ nextValue }}, "deviceID": "68AD6ADD-86B6-443B-B6EB-9C0275622649", "tagName": "ttt"}`
+
+	funcMap = template.FuncMap{
+		"unixNow":    unixNow,
+		"randomUUID": randomUUID,
+		"nextValue":  nextValue,
+	}
+
+	value = 0
 )
 
+func randomUUID() string {
+	return uuid.NewV4().String()
+}
+
+func nextValue() string {
+	value += 1
+	return strconv.Itoa(value)
+}
+
+func unixNow() string {
+	return strconv.FormatInt(time.Now().Unix(), 10)
+}
+
+func produceMessage(t *template.Template) ([]byte, error) {
+	buffer := bytes.NewBuffer(nil)
+	err := t.Execute(buffer, nil)
+	if err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
 func producer(ctx context.Context, pctx *producerCtx) {
+
+	tmpl := template.New("").Funcs(funcMap)
+	tmplGet := template.Must(tmpl.Parse(msgTemplate))
+
 	var done int32 = 0
 	var failed int32 = 0
 	var sent int32 = 0
@@ -47,11 +86,16 @@ func producer(ctx context.Context, pctx *producerCtx) {
 		select {
 		case <-t.C:
 			{
-				err := pctx.conn.Publish(mqttTopic, []byte(fmt.Sprintf("message %d", counter)))
+				data, err := produceMessage(tmplGet)
+				if err != nil {
+					panic(fmt.Sprintf("produce message failed %s", err.Error()))
+				}
+				err = pctx.conn.Publish(mqttTopic, data)
 				counter++
 				sent++
 				if err != nil {
 					failed++
+					time.Sleep(time.Millisecond * 2) // imitate of work on persist
 				}
 			}
 		case <-producerStats.C:
@@ -74,6 +118,25 @@ func producer(ctx context.Context, pctx *producerCtx) {
 		case <-pctx.pubErrorChan:
 			{
 				failed += 1
+				time.Sleep(time.Millisecond * 2) // imitate of work on persist
+			}
+		}
+	}
+}
+
+func workImitator(ctx context.Context) {
+	counter := 0
+	w := time.NewTicker(time.Millisecond * 20)
+	for {
+
+		select {
+		case <-w.C:
+			{
+				counter += 1
+			}
+		case <-ctx.Done():
+			{
+
 			}
 		}
 	}
@@ -114,6 +177,10 @@ func main() {
 
 	go connection.Run(ctx)
 	go producer(ctx, pctx)
+
+	for i := 0; i < 1000; i++ {
+		go workImitator(ctx)
+	}
 
 	if err := connection.Start(); err != nil {
 		logrus.Errorf("start failed %s", err.Error())
