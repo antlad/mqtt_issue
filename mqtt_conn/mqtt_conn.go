@@ -102,7 +102,6 @@ const (
 var once sync.Once
 var systemPool *x509.CertPool
 
-
 func NewConnection(conf *CloudConnectionOptions) (CloudConnection, error) {
 
 	options := mqtt.NewClientOptions()
@@ -205,14 +204,13 @@ func (m *mqttConnection) Run(ctx context.Context) {
 			}
 		}
 	}
-	cycleTimer := time.NewTicker(time.Second * 2)
+	cycleTimer := time.NewTicker(time.Second)
 
 	for {
 		select {
 		case <-cycleTimer.C:
 			{
 				fmt.Println("---------------------------------------")
-				cycleTimer = time.NewTicker(time.Second * 2)
 			}
 		case <-checkTokens.C:
 			{
@@ -250,7 +248,7 @@ func (m *mqttConnection) Run(ctx context.Context) {
 				}
 
 				waitList = waitMore
-				checkTokens = time.NewTicker(checkTokensTimeout)
+				//checkTokens = time.NewTicker(checkTokensTimeout)
 			}
 		case <-reconnectTimer.C:
 			{
@@ -258,7 +256,7 @@ func (m *mqttConnection) Run(ctx context.Context) {
 					m.logMessage().Info("try to reconnect")
 					doConnect()
 				}
-				reconnectTimer = time.NewTicker(reconnectTimeoutStep)
+				//reconnectTimer = time.NewTicker(reconnectTimeoutStep)
 			}
 		case <-ctx.Done():
 			{
@@ -272,12 +270,12 @@ func (m *mqttConnection) Run(ctx context.Context) {
 					continue
 				}
 
-				fmt.Println("+++ before publish")
+				//fmt.Println("+++ before publish")
 				t := m.client.Publish(msg.topic, mqttQOS, false, msg.payload)
-				fmt.Println("+++ after publish")
+				//fmt.Println("+++ after publish")
 				t.Wait()
 				if t.Error() != nil {
-					m.lastErr.Store(t.Error())
+					//m.lastErr.Store(t.Error())
 					msg.token = t
 					sendBack(msg, t.Error())
 				}

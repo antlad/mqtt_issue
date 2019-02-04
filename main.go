@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -12,35 +13,78 @@ import (
 )
 
 type producerCtx struct {
-	pubErrorChan       chan *cloud_conn.PublishError
-	pubDoneChan        chan int32
-	conn cloud_conn.CloudConnection
+	pubErrorChan chan *cloud_conn.PublishError
+	pubDoneChan  chan int32
+	conn         cloud_conn.CloudConnection
 }
 
+const (
+	freq = 10000
+)
+
+func getEnv(env string, val string) string {
+	actual := os.Getenv(env)
+	if len(actual) == 0 {
+		return val
+	}
+
+	return actual
+}
+
+var (
+	mqttTopic = getEnv("MQTT_TOPIC", "topic1")
+)
+
 func producer(ctx context.Context, pctx *producerCtx) {
-	for{
+	var done int32 = 0
+	var failed int32 = 0
+	var sent int32 = 0
+	counter := 0
+	producerStats := time.NewTicker(time.Second)
+	t := time.NewTicker(time.Duration(float64(time.Second) / float64(freq)))
+
+	for {
 		select {
-		case <-ctx.Done():{
-			logrus.Info("exiting producer")
-			return
-		}
-		case d := <-pctx.pubDoneChan:{
-			logrus.Infof("publish done for %d messages", d)
-		}
-
-
+		case <-t.C:
+			{
+				err := pctx.conn.Publish(mqttTopic, []byte(fmt.Sprintf("message %d", counter)))
+				counter++
+				sent++
+				if err != nil {
+					failed++
+				}
+			}
+		case <-producerStats.C:
+			{
+				fmt.Println(fmt.Sprintf("+++++++++ sent: %d, done: %d, failed: %d ++++++++++++++++++++", sent, done, failed))
+				done = 0
+				failed = 0
+				sent = 0
+				producerStats = time.NewTicker(time.Second)
+			}
+		case <-ctx.Done():
+			{
+				logrus.Info("exiting producer")
+				return
+			}
+		case d := <-pctx.pubDoneChan:
+			{
+				done += d
+			}
+		case <-pctx.pubErrorChan:
+			{
+				failed += 1
+			}
 		}
 	}
 }
-
-
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pctx := &producerCtx{
 		pubErrorChan: make(chan *cloud_conn.PublishError, 1),
-		pubDoneChan: make(chan int32, 1),
+		pubDoneChan:  make(chan int32, 1),
 	}
 
 	logrus.SetLevel(logrus.DebugLevel)
@@ -66,6 +110,7 @@ func main() {
 		logrus.Error("create connection failed ", err.Error())
 		return
 	}
+	pctx.conn = connection
 
 	go connection.Run(ctx)
 	go producer(ctx, pctx)
