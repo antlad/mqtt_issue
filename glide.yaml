@@ -1,0 +1,7 @@
+package: github.com/antlad/mqtt_issue
+import:
+- package: github.com/Sirupsen/logrus
+- package: github.com/eclipse/paho.mqtt.golang
+  version: cb7eb9363b4469c601b1a714447653b720e4e43a
+  subpackages:
+  - packets

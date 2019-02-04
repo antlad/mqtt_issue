@@ -1,0 +1,24 @@
+hash: 30b993e0c5f4970c804689338cd0d6eb5138613f711e37980b5c104963e9d63d
+updated: 2019-02-04T09:28:32.943999292+03:00
+imports:
+- name: github.com/eclipse/paho.mqtt.golang
+  version: cb7eb9363b4469c601b1a714447653b720e4e43a
+  subpackages:
+  - packets
+- name: github.com/Sirupsen/logrus
+  version: c155da19408a8799da419ed3eeb0cb5db0ad5dbc
+- name: golang.org/x/crypto
+  version: a2144134853fc9a27a7b1e3eb4f19f1a76df13c9
+  subpackages:
+  - ssh/terminal
+- name: golang.org/x/net
+  version: 92b859f39abd2d91a854c9f9c4621b2f5054a92d
+  subpackages:
+  - proxy
+  - websocket
+- name: golang.org/x/sys
+  version: b90733256f2e882e81d52f9126de08df5615afd9
+  subpackages:
+  - unix
+  - windows
+testImports: []
