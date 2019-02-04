@@ -5,15 +5,3 @@ import:
   version: cb7eb9363b4469c601b1a714447653b720e4e43a
   subpackages:
   - packets
-- package: golang.org/x/net
-  version: 92b859f39abd2d91a854c9f9c4621b2f5054a92d
-  subpackages:
-    - context
-    - proxy
-    - publicsuffix
-    - websocket
-- package: golang.org/x/sys
-  version: b90733256f2e882e81d52f9126de08df5615afd9
-  subpackages:
-    - unix
-    - windows

@@ -197,7 +197,7 @@ func (m *mqttConnection) Run(ctx context.Context) {
 			m.logMessage().Error("no response from mqtt connection")
 		} else {
 			if t.Error() != nil {
-				m.lastErr.Store(t.Error())
+				//m.lastErr.Store(t.Error())
 				m.logMessage().WithField("error", t.Error()).Error("connect failed")
 			} else {
 				m.logMessage().Info("connect done")
@@ -229,7 +229,7 @@ func (m *mqttConnection) Run(ctx context.Context) {
 					}
 
 					if t.token.Error() != nil {
-						m.lastErr.Store(t.token.Error())
+						//m.lastErr.Store(t.token.Error())
 						sendBack(t, t.token.Error())
 						continue
 					}
@@ -248,7 +248,6 @@ func (m *mqttConnection) Run(ctx context.Context) {
 				}
 
 				waitList = waitMore
-				//checkTokens = time.NewTicker(checkTokensTimeout)
 			}
 		case <-reconnectTimer.C:
 			{
@@ -256,7 +255,6 @@ func (m *mqttConnection) Run(ctx context.Context) {
 					m.logMessage().Info("try to reconnect")
 					doConnect()
 				}
-				//reconnectTimer = time.NewTicker(reconnectTimeoutStep)
 			}
 		case <-ctx.Done():
 			{

@@ -57,7 +57,7 @@ def main():
         print("=================new cycle================================")
         random_sleep()
         os.system("killall mosquitto_sub")
-        mqtt_process.terminate()
+        mqtt_process.kill()
         mqtt_process.wait()
         random_sleep()
         mqtt_process = create_and_run(mqtt_server_command, cwd=os.path.join(os.getcwd(), "mqtt_srv"))
