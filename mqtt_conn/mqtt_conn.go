@@ -1,7 +1,3 @@
-//
-// Copyright (c) 2018 Litmus Automation Inc.
-//
-
 package cloud_conn
 
 import (
@@ -177,6 +173,7 @@ func (m *mqttConnection) Run(ctx context.Context) {
 	waitList := make([]*publishMessage, 0)
 	checkTokens := time.NewTicker(checkTokensTimeout)
 	reconnectTimer := time.NewTicker(reconnectTimeoutStep)
+	cycleTimer := time.NewTicker(time.Second)
 
 	sendBack := func(t *publishMessage, err error) {
 		select {
@@ -204,7 +201,6 @@ func (m *mqttConnection) Run(ctx context.Context) {
 			}
 		}
 	}
-	cycleTimer := time.NewTicker(time.Second)
 
 	for {
 		select {
@@ -243,7 +239,7 @@ func (m *mqttConnection) Run(ctx context.Context) {
 						{
 						}
 					default:
-						m.logMessage().Error("mqtt connection pub done queue full. dropping")
+						m.logMessage().Debug("mqtt connection pub done queue full. dropping")
 					}
 				}
 

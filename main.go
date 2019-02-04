@@ -17,13 +17,15 @@ import (
 )
 
 type producerCtx struct {
-	pubErrorChan chan *cloud_conn.PublishError
-	pubDoneChan  chan int32
-	conn         cloud_conn.CloudConnection
+	pubErrorChan       chan *cloud_conn.PublishError
+	pubDoneChan        chan int32
+	conn               cloud_conn.CloudConnection
+	stateChangedNotify chan cloud_conn.ConnectionState
 }
 
 const (
-	freq = 10000
+	freq     = 100
+	pubCount = 100
 )
 
 func getEnv(env string, val string) string {
@@ -86,16 +88,20 @@ func producer(ctx context.Context, pctx *producerCtx) {
 		select {
 		case <-t.C:
 			{
-				data, err := produceMessage(tmplGet)
-				if err != nil {
-					panic(fmt.Sprintf("produce message failed %s", err.Error()))
-				}
-				err = pctx.conn.Publish(mqttTopic, data)
-				counter++
-				sent++
-				if err != nil {
-					failed++
-					time.Sleep(time.Millisecond * 2) // imitate of work on persist
+
+				for i := 0; i < pubCount; i++ {
+					data, err := produceMessage(tmplGet)
+					if err != nil {
+						panic(fmt.Sprintf("produce message failed %s", err.Error()))
+					}
+
+					err = pctx.conn.Publish(mqttTopic, data)
+					counter++
+					sent++
+					if err != nil {
+						failed++
+						time.Sleep(time.Millisecond) // imitate of work on persist
+					}
 				}
 			}
 		case <-producerStats.C:
@@ -104,7 +110,6 @@ func producer(ctx context.Context, pctx *producerCtx) {
 				done = 0
 				failed = 0
 				sent = 0
-				producerStats = time.NewTicker(time.Second)
 			}
 		case <-ctx.Done():
 			{
@@ -118,25 +123,21 @@ func producer(ctx context.Context, pctx *producerCtx) {
 		case <-pctx.pubErrorChan:
 			{
 				failed += 1
-				time.Sleep(time.Millisecond * 2) // imitate of work on persist
+				time.Sleep(time.Millisecond) // imitate of work on persist
 			}
-		}
-	}
-}
-
-func workImitator(ctx context.Context) {
-	counter := 0
-	w := time.NewTicker(time.Millisecond * 20)
-	for {
-
-		select {
-		case <-w.C:
+		case s := <-pctx.stateChangedNotify:
 			{
-				counter += 1
-			}
-		case <-ctx.Done():
-			{
+				switch s {
+				case cloud_conn.Disconnected:
+					{
+						logrus.Info("event disconnected")
 
+					}
+				case cloud_conn.Connected:
+					{
+						logrus.Info("event connected")
+					}
+				}
 			}
 		}
 	}
@@ -146,8 +147,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pctx := &producerCtx{
-		pubErrorChan: make(chan *cloud_conn.PublishError, 1),
-		pubDoneChan:  make(chan int32, 1),
+		pubErrorChan:       make(chan *cloud_conn.PublishError),
+		pubDoneChan:        make(chan int32),
+		stateChangedNotify: make(chan cloud_conn.ConnectionState),
 	}
 
 	logrus.SetLevel(logrus.DebugLevel)
@@ -159,16 +161,18 @@ func main() {
 	}
 
 	connection, err := cloud_conn.NewConnection(&cloud_conn.CloudConnectionOptions{
-		Host:         "127.0.0.1",
-		Scheme:       "ssl",
-		Port:         8883,
-		ClientID:     "id1",
-		UserName:     "user1",
-		Password:     "password",
-		SslRootCA:    string(cert),
-		PubErrorChan: pctx.pubErrorChan,
-		PubDoneChan:  pctx.pubDoneChan,
+		Host:               "127.0.0.1",
+		Scheme:             "ssl",
+		Port:               8883,
+		ClientID:           "id1",
+		UserName:           "user1",
+		Password:           "password",
+		SslRootCA:          string(cert),
+		PubErrorChan:       pctx.pubErrorChan,
+		PubDoneChan:        pctx.pubDoneChan,
+		StateChangedNotify: pctx.stateChangedNotify,
 	})
+
 	if err != nil {
 		logrus.Error("create connection failed ", err.Error())
 		return
@@ -177,10 +181,6 @@ func main() {
 
 	go connection.Run(ctx)
 	go producer(ctx, pctx)
-
-	for i := 0; i < 1000; i++ {
-		go workImitator(ctx)
-	}
 
 	if err := connection.Start(); err != nil {
 		logrus.Errorf("start failed %s", err.Error())
