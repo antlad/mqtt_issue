@@ -160,7 +160,7 @@ func main() {
 		return
 	}
 
-	connection, err := cloud_conn.NewConnection(&cloud_conn.CloudConnectionOptions{
+	connection, err := cloud_conn.NewAnotherConnection(&cloud_conn.CloudConnectionOptions{
 		Host:               "127.0.0.1",
 		Scheme:             "ssl",
 		Port:               8883,

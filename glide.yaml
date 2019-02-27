@@ -5,3 +5,4 @@ import:
   version: cb7eb9363b4469c601b1a714447653b720e4e43a
   subpackages:
   - packets
+- package: github.com/goiiot/libmqtt
